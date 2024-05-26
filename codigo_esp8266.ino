@@ -8,7 +8,7 @@ const char psw[] = "912345678";
 
 
 // Site remoto - Coloque aqui os dados do site que vai receber a requisição GET
-const char http_site[] = "192.168.1.226";
+const char http_site[] = "192.168.1.119";
 const int http_port = 8081;
 const char http_path[] = "/cadastrar";
 
@@ -17,7 +17,7 @@ const char http_path[] = "/cadastrar";
 unsigned long previousMillis = 0;
 const long interval = 5000;
 
-IPAddress server(192, 168, 1, 226);  // Endereço IP do servidor - http_site
+IPAddress server(192, 168, 1, 119);  // Endereço IP do servidor - http_site
 #define trigPin D7
 #define echoPin D6
 
@@ -49,6 +49,7 @@ int distance;
 
 void loop() {
 
+
   // Gera um pulso ultrassônico
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -64,6 +65,7 @@ void loop() {
 
   if (distance <= 5 && distance >= 1) {
     Serial.println("Está cheio");
+    sendDataToServer("1");
   } else {
     Serial.println("Não está cheio");
   }
@@ -72,44 +74,27 @@ void loop() {
 }
 
 
-bool sendDataToServer(boolean cheio) {
-  WiFiClientSecure client;
-  client.setInsecure();
+bool sendDataToServer( String cheio) {
+  HTTPClient http;
+  WiFiClient client;
 
-  String url = "https://" + String(http_site) + http_path + "/" + String(cheio);
+  String url = "http://" + String(http_site) + ":" + String(http_port) + http_path + "/" + String(cheio);
 
   Serial.println("fazendo request");
   Serial.println(url);
 
+  http.begin(client, url);
 
-  if (client.connect(http_site, http_port)) {
-    Serial.println("conectado ao cliente");
-    //client.print(String("GET ") + url + " HTTP/1.1\r\n" + "Host: " + http_site + "\r\n" + "Connection: close\r\n\r\n");
-    client.print(String("GET /cadastrar/") + (cheio) + " HTTP/1.1\r\n" + "Host: " + http_site + "\r\n" + "Connection: close\r\n\r\n");
+  int httpCode = http.GET();
 
-    while (client.connected()) {
-      Serial.println("esperando por resposta do servidor");
-      String line = client.readStringUntil('\n');
-      if (line == "\r") {
-        break;
-      }
-    }
+  if (httpCode > 0) {
+    String payload = http.getString();
+    Serial.println(httpCode);
+    Serial.println(payload);
+  } else {
+    Serial.println("Falha na requisição");
+  }
 
-    while (client.available()) {
-      Serial.println("esperando resto da resposta");
-      String line = client.readStringUntil('\n');
-      Serial.println(line);
-    }
-
-    Serial.println("concluído");
-
-    client.stop();
-    return true;
-  } 
-    
-  Serial.println("Falha na conexão com o servidor");
-  return false;
+  http.end();
+  return httpCode > 0;
 }
-
-
-
